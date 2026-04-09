@@ -187,6 +187,19 @@
   .sidebar-user .role { font-size: 10px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 1px; }
   .sidebar-user button { margin-left: auto; background: none; border: none; color: var(--text-soft); cursor: pointer; padding: 6px; border-radius: 8px; }
   .sidebar-user button:hover { background: var(--glass); color: var(--red); }
+  .sidebar-user .user-clickable { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; border-radius: 10px; padding: 2px; transition: background .15s; }
+  .sidebar-user .user-clickable:hover { background: var(--glass); }
+  .avatar-gallery { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 10px; }
+  .avatar-gallery img { width: 100%; aspect-ratio: 1; border-radius: 14px; object-fit: cover; cursor: pointer; border: 3px solid transparent; transition: all .15s; }
+  .avatar-gallery img:hover { transform: scale(1.06); }
+  .avatar-gallery img.selected { border-color: var(--p); box-shadow: 0 0 0 3px rgba(192,38,211,.25); }
+  .profile-pic-big { width: 120px; height: 120px; border-radius: 28px; object-fit: cover; display: block; margin: 0 auto 14px; border: 3px solid var(--glass-border); }
+  .collab-stat-card { padding: 14px 16px; background: var(--glass-strong); border: 1px solid var(--glass-border); border-radius: 14px; text-align: center; }
+  .collab-stat-card .val { font-size: 26px; font-weight: 800; color: var(--label); }
+  .collab-stat-card .lbl { font-size: 10px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+  .collab-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 14px 0; }
+  .admin-list-item.clickable { cursor: pointer; transition: background .15s; }
+  .admin-list-item.clickable:hover { background: var(--glass); }
 
   .dash-main { padding: 24px 32px; overflow-y: auto; height: 100vh; }
   .dash-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; gap: 16px; }
@@ -781,6 +794,7 @@ function loadLocal() {
   state.logs = JSON.parse(localStorage.getItem("crm_logs") || "[]");
   state.groups = JSON.parse(localStorage.getItem("crm_groups") || "[]");
   state.notifications = JSON.parse(localStorage.getItem("crm_notifs") || "[]");
+  state.adminProfile = JSON.parse(localStorage.getItem("crm_admin_profile") || "null") || { nom: "Administrateur", img: null };
   const savedSettings = JSON.parse(localStorage.getItem("crm_settings") || "null");
   if (savedSettings) state.settings = { ...state.settings, ...savedSettings };
   applySettings();
@@ -1272,9 +1286,32 @@ adminNode.querySelector(".content").addEventListener("click", () => {
   loginMain.classList.add("split");
 });
 
+function updateAdminNode() {
+  const prof = state.adminProfile || {};
+  const picEl = adminNode.querySelector(".pic");
+  const labelEl = adminNode.querySelector(".node-label");
+  if (labelEl) labelEl.textContent = prof.nom || "Administrateur";
+  if (picEl) {
+    if (prof.img) {
+      // Remplace le contenu par la photo admin, en gardant les sparkles
+      picEl.innerHTML = `
+        <div class="sparkle"></div><div class="sparkle"></div><div class="sparkle"></div><div class="sparkle"></div><div class="sparkle"></div>
+        <img src="${prof.img}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:30px;"/>
+      `;
+    } else {
+      picEl.innerHTML = `
+        <div class="sparkle"></div><div class="sparkle"></div><div class="sparkle"></div><div class="sparkle"></div><div class="sparkle"></div>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 16L3 7l5.5 4L12 4l3.5 7L21 7l-2 9H5zm0 2h14v2H5v-2z"/></svg>
+      `;
+    }
+  }
+}
+
 function renderOrbit() {
   axis.querySelectorAll(".node").forEach(n => n.remove());
   nodes = [];
+  // Met à jour le noeud admin au centre avec la photo/nom sauvegardés
+  updateAdminNode();
   const total = state.staff.length + 1;
   const make = (i, inner, onClick) => {
     const baseAngle = (i * 360) / total;
@@ -1336,10 +1373,15 @@ requestAnimationFrame(animate);
 function renderLoginPanel() {
   if (state.loginSelected) {
     const u = state.loginSelected;
+    const adminImg = state.adminProfile?.img;
+    const adminName = state.adminProfile?.nom || "Administrateur";
     const pfp = u.isAdmin
-      ? `<div class="big-pfp-wrap admin-pfp"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 16L3 7l5.5 4L12 4l3.5 7L21 7l-2 9H5zm0 2h14v2H5v-2z"/></svg></div>`
+      ? (adminImg
+        ? `<div class="big-pfp-wrap"><img src="${adminImg}"/></div>`
+        : `<div class="big-pfp-wrap admin-pfp"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 16L3 7l5.5 4L12 4l3.5 7L21 7l-2 9H5zm0 2h14v2H5v-2z"/></svg></div>`)
       : `<div class="big-pfp-wrap"><img src="${u.img}"/></div>`;
-    panel.innerHTML = `<div class="card">${pfp}<h2>${u.nom}</h2><input type="password" id="loginPass" placeholder="Mot de passe"/><button class="btn" id="loginBtn"><span>Connexion</span></button><p class="back" id="backBtn">Retour</p></div>`;
+    const displayName = u.isAdmin ? adminName : u.nom;
+    panel.innerHTML = `<div class="card">${pfp}<h2>${displayName}</h2><input type="password" id="loginPass" placeholder="Mot de passe"/><button class="btn" id="loginBtn"><span>Connexion</span></button><p class="back" id="backBtn">Retour</p></div>`;
     document.getElementById("loginBtn").addEventListener("click", doLogin);
     document.getElementById("loginPass").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
   } else if (state.loginIsAdd) {
@@ -1440,8 +1482,9 @@ function enterDashboard() {
 function renderSidebar() {
   const u = state.currentUser;
   const img = u.img || `https://i.pravatar.cc/150?u=admin`;
-  document.getElementById("sidebarUser").innerHTML = `<img src="${img}" alt=""/><div><div class="name">${u.nom}</div><div class="role">${u.isAdmin ? "Admin" : "Membre"}</div></div><button id="logoutBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>`;
+  document.getElementById("sidebarUser").innerHTML = `<div class="user-clickable" id="openProfile" title="Modifier mon profil"><img src="${img}" alt=""/><div style="flex:1;min-width:0;"><div class="name">${u.nom}</div><div class="role">${u.isAdmin ? "Admin" : "Membre"} · ✏️ modifier</div></div></div><button id="logoutBtn" title="Déconnexion"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>`;
   document.getElementById("logoutBtn").addEventListener("click", logout);
+  document.getElementById("openProfile").addEventListener("click", openProfileModal);
 
   // Notif bell binding
   const bell = document.getElementById("notifBell");
@@ -1487,6 +1530,111 @@ function logout() {
   document.getElementById("dashScreen").classList.remove("active");
   document.getElementById("loginScreen").style.display = "block";
   closeLoginPanel();
+}
+
+// ----- Profil utilisateur -----
+const DEFAULT_AVATARS = [
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=c0aede",
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Luna&backgroundColor=ffd5dc",
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Max&backgroundColor=b6e3f4",
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Sophie&backgroundColor=ffdfbf",
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex&backgroundColor=d1d4f9",
+  "https://api.dicebear.com/7.x/avataaars/svg?seed=Emma&backgroundColor=c0aede",
+  "https://api.dicebear.com/7.x/bottts/svg?seed=Rex&backgroundColor=c0aede",
+  "https://api.dicebear.com/7.x/bottts/svg?seed=Zara&backgroundColor=ffd5dc",
+  "https://api.dicebear.com/7.x/bottts/svg?seed=Neo&backgroundColor=b6e3f4",
+  "https://api.dicebear.com/7.x/bottts/svg?seed=Nova&backgroundColor=ffdfbf",
+  "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Happy&backgroundColor=c0aede",
+  "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Cool&backgroundColor=b6e3f4",
+];
+
+function openProfileModal() {
+  const u = state.currentUser;
+  if (!u) return;
+  let selectedImg = u.img || DEFAULT_AVATARS[0];
+  const [firstName, ...rest] = (u.nom || "").split(" ");
+  const lastName = rest.join(" ");
+  openModal(`
+    <h2>Mon profil</h2>
+    <div class="modal-form">
+      <img src="${selectedImg}" id="profilePreview" class="profile-pic-big" alt=""/>
+      <div class="modal-form-row">
+        <div><label>Prénom</label><input id="pf_first" value="${firstName || ''}"/></div>
+        <div><label>Nom</label><input id="pf_last" value="${lastName || ''}"/></div>
+      </div>
+      <label>Photo personnelle (URL)</label>
+      <input id="pf_customImg" placeholder="https://..." value="${u.img && !DEFAULT_AVATARS.includes(u.img) ? u.img : ''}"/>
+      <label style="margin-top:10px;">Ou choisis un avatar</label>
+      <div class="avatar-gallery" id="avatarGallery">
+        ${DEFAULT_AVATARS.map(a => `<img src="${a}" data-avatar="${a}" class="${a === selectedImg ? 'selected' : ''}"/>`).join("")}
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelPf">Annuler</button>
+      <button class="btn" id="savePf">Enregistrer</button>
+    </div>
+  `, "modal-lg");
+  const preview = document.getElementById("profilePreview");
+  const customInput = document.getElementById("pf_customImg");
+  // Sélection d'un avatar
+  document.querySelectorAll("#avatarGallery img").forEach(el => {
+    el.addEventListener("click", () => {
+      selectedImg = el.dataset.avatar;
+      preview.src = selectedImg;
+      customInput.value = "";
+      document.querySelectorAll("#avatarGallery img").forEach(x => x.classList.remove("selected"));
+      el.classList.add("selected");
+    });
+  });
+  // URL perso en priorité si saisie
+  customInput.addEventListener("input", () => {
+    if (customInput.value.trim()) {
+      selectedImg = customInput.value.trim();
+      preview.src = selectedImg;
+      document.querySelectorAll("#avatarGallery img").forEach(x => x.classList.remove("selected"));
+    }
+  });
+  document.getElementById("cancelPf").addEventListener("click", closeModal);
+  document.getElementById("savePf").addEventListener("click", async () => {
+    const btn = document.getElementById("savePf");
+    setLoading(btn, true);
+    const first = document.getElementById("pf_first").value.trim();
+    const last = document.getElementById("pf_last").value.trim();
+    const nom = (first + " " + last).trim();
+    if (!nom) { toast("Prénom requis", "error"); setLoading(btn, false); return; }
+    const finalImg = customInput.value.trim() || selectedImg;
+    try {
+      if (u.isAdmin) {
+        // Admin : persistance dans state.adminProfile + localStorage pour affichage sur l'écran d'accueil
+        state.adminProfile = { nom, img: finalImg };
+        localStorage.setItem("crm_admin_profile", JSON.stringify(state.adminProfile));
+        state.currentUser.nom = nom;
+        state.currentUser.img = finalImg;
+        updateAdminNode();
+      } else {
+        // Membre : on met à jour le doc staff Firestore
+        const staffDoc = state.staff.find(s => s.id === u.id);
+        if (staffDoc) {
+          staffDoc.nom = nom;
+          staffDoc.img = finalImg;
+          await saveDoc("staff", u.id, { nom, img: finalImg });
+        }
+        state.currentUser.nom = nom;
+        state.currentUser.img = finalImg;
+      }
+      await logActivity("Profil modifié", nom);
+      toast("Profil mis à jour", "success");
+      renderSidebar();
+      renderOrbit();
+      rerender();
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      toast("Erreur de sauvegarde", "error");
+    } finally {
+      setLoading(btn, false);
+    }
+  });
 }
 
 function renderDashboard() {
@@ -1560,7 +1708,11 @@ function renderDashboard() {
 // ============================================================
 function renderContacts() {
   if (state.view !== "contacts") return;
+  const isAdmin = !!state.currentUser?.isAdmin;
+  const myId = state.currentUser?.id;
   const filtered = state.contacts.filter(c => {
+    // RBAC: les membres ne voient QUE leurs leads attribués
+    if (!isAdmin && c.assignedTo !== myId) return false;
     if (state.activeGroup && c.groupId !== state.activeGroup) return false;
     if (state.selectedStatus && c.statut !== state.selectedStatus) return false;
     if (state.onlyUnassigned && c.assignedTo) return false;
@@ -1575,10 +1727,14 @@ function renderContacts() {
     .map(p => `<div class="filter-pill ${state.selectedStatus === p.key ? "active" : ""}" data-status="${p.key || ""}">${p.label}</div>`).join("");
   const rows = filtered.map(c => {
     const tags = (c.tags || []).map(t => `<span class="tag" style="background:${t.color}22;color:${t.color}">${t.label}</span>`).join("");
-    return `<div class="contact-row" data-id="${c.id}"><div data-label="Nom"><strong>${c.nom}</strong> ${tags}</div><div data-label="Email">${c.email || "—"}</div><div data-label="Téléphone">${phoneLink(c.tel)}</div><div data-label="Ville">${c.ville || "—"}</div><div data-label="Statut">${statusPill(c.statut)}</div><div class="row-actions"><button class="icon-btn" data-edit="${c.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="icon-btn" data-del="${c.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button></div></div>`;
+    const actionsHtml = isAdmin
+      ? `<div class="row-actions"><button class="icon-btn" data-edit="${c.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="icon-btn" data-del="${c.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button></div>`
+      : `<div class="row-actions"><button class="icon-btn" data-edit="${c.id}" title="Voir / changer statut"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>`;
+    return `<div class="contact-row" data-id="${c.id}"><div data-label="Nom"><strong>${c.nom}</strong> ${tags}</div><div data-label="Email">${c.email || "—"}</div><div data-label="Téléphone">${phoneLink(c.tel)}</div><div data-label="Ville">${c.ville || "—"}</div><div data-label="Statut">${statusPill(c.statut)}</div>${actionsHtml}</div>`;
   }).join("");
+  const newBtnHtml = isAdmin ? '<button class="btn btn-sm" id="newContact">+ Nouveau</button>' : '';
   document.getElementById("dashMain").innerHTML = `
-    <div class="dash-header"><div><div class="dash-title">Contacts</div><div class="dash-subtitle">${filtered.length} contact${filtered.length > 1 ? "s" : ""}</div></div><div class="dash-actions"><button class="btn btn-sm" id="exportCsv">Export CSV</button><button class="btn btn-sm" id="newContact">+ Nouveau</button></div></div>
+    <div class="dash-header"><div><div class="dash-title">Contacts</div><div class="dash-subtitle">${filtered.length} contact${filtered.length > 1 ? "s" : ""}</div></div><div class="dash-actions"><button class="btn btn-sm" id="exportCsv">Export CSV</button>${newBtnHtml}</div></div>
     <div class="filter-bar">${pills}<input class="search-input" id="searchInput" placeholder="Rechercher..." value="${state.search}"/></div>
     <div class="contacts-table"><div class="contact-row header"><div>Nom</div><div>Email</div><div>Téléphone</div><div>Ville</div><div>Statut</div><div></div></div>${rows || '<div class="empty-state">Aucun contact trouvé</div>'}</div>
   `;
@@ -1587,7 +1743,7 @@ function renderContacts() {
   document.querySelectorAll(".contact-row[data-id]").forEach(r => r.addEventListener("click", e => { if (e.target.closest(".icon-btn")) return; openContactModal(r.dataset.id); }));
   document.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => openContactModal(b.dataset.edit)));
   document.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => confirmDeleteContact(b.dataset.del)));
-  document.getElementById("newContact").addEventListener("click", () => openContactModal(null));
+  document.getElementById("newContact")?.addEventListener("click", () => openContactModal(null));
   document.getElementById("exportCsv").addEventListener("click", () => exportContactsCSV(filtered));
 }
 
@@ -1595,56 +1751,87 @@ function openContactModal(id) {
   const c = id ? state.contacts.find(x => x.id === id) : { nom: "", email: "", tel: "", ville: "", statut: "nouveau", notes: "", tags: [], history: [], custom: {}, assignedTo: state.currentUser?.id || "" };
   if (!c) return;
   const isNew = !id;
+  const isAdmin = !!state.currentUser?.isAdmin;
+  // Un membre ne peut pas créer de contact ni en voir un qui ne lui est pas attribué
+  if (!isAdmin) {
+    if (isNew) { toast("Création réservée à l'admin", "error"); return; }
+    if (c.assignedTo !== state.currentUser?.id) { toast("Ce contact ne vous est pas attribué", "error"); return; }
+  }
+  const ro = !isAdmin ? "readonly" : "";
+  const dis = !isAdmin ? "disabled" : "";
   const customFieldsHtml = state.settings.customFields.map(f =>
-    `<label>${f.label}</label><input id="ct_custom_${f.key}" type="${f.type || 'text'}" value="${(c.custom && c.custom[f.key]) || ''}"/>`
+    `<label>${f.label}</label><input id="ct_custom_${f.key}" type="${f.type || 'text'}" value="${(c.custom && c.custom[f.key]) || ''}" ${ro}/>`
   ).join("");
-  const historyHtml = (c.history || []).slice(0, 8).map(h => `<div class="timeline-item"><div class="timeline-dot"></div><div><div class="timeline-content">${h.text}</div><div class="timeline-time">${new Date(h.at).toLocaleString("fr-FR")}</div></div></div>`).join("");
+  const historyHtml = (c.history || []).map(h => `<div class="timeline-item"><div class="timeline-dot"></div><div><div class="timeline-content">${h.text}</div><div class="timeline-time">${h.by ? '<b>' + h.by + '</b> · ' : ''}${new Date(h.at).toLocaleString("fr-FR")}</div></div></div>`).join("");
   openModal(`
     <h2>${isNew ? "Nouveau contact" : c.nom}</h2>
     <div class="modal-form">
-      <label>Nom</label><input id="ct_nom" value="${c.nom || ''}"/>
+      <label>Nom</label><input id="ct_nom" value="${c.nom || ''}" ${ro}/>
       <div class="modal-form-row">
-        <div><label>Email</label><input id="ct_email" type="email" value="${c.email || ''}"/></div>
-        <div><label>Téléphone</label><input id="ct_tel" value="${c.tel || ''}"/></div>
+        <div><label>Email</label><input id="ct_email" type="email" value="${c.email || ''}" ${ro}/></div>
+        <div><label>Téléphone</label><input id="ct_tel" value="${c.tel || ''}" ${ro}/></div>
       </div>
       <div class="modal-form-row">
-        <div><label>Ville</label><input id="ct_ville" value="${c.ville || ''}"/></div>
+        <div><label>Ville</label><input id="ct_ville" value="${c.ville || ''}" ${ro}/></div>
         <div><label>Statut</label><select id="ct_statut">${state.settings.statuses.map(s => `<option value="${s.key}" ${s.key === c.statut ? "selected" : ""}>${s.label}</option>`).join("")}</select></div>
       </div>
       <label>Assigné à</label>
-      <select id="ct_assigned"><option value="">— Personne —</option>${state.staff.map(s => `<option value="${s.id}" ${s.id === c.assignedTo ? "selected" : ""}>${s.nom}</option>`).join("")}</select>
+      <select id="ct_assigned" ${dis}><option value="">— Personne —</option>${state.staff.map(s => `<option value="${s.id}" ${s.id === c.assignedTo ? "selected" : ""}>${s.nom}</option>`).join("")}</select>
       <label>Groupe</label>
-      <select id="ct_group"><option value="">— Aucun —</option>${state.groups.map(g => `<option value="${g.id}" ${g.id === c.groupId ? "selected" : ""}>${g.name}</option>`).join("")}</select>
+      <select id="ct_group" ${dis}><option value="">— Aucun —</option>${state.groups.map(g => `<option value="${g.id}" ${g.id === c.groupId ? "selected" : ""}>${g.name}</option>`).join("")}</select>
       ${customFieldsHtml}
-      <label>Notes</label><textarea id="ct_notes">${c.notes || ''}</textarea>
+      <label>Notes (visible par tous)</label><textarea id="ct_notes">${c.notes || ''}</textarea>
       <label>Ajouter à l'historique</label><input id="ct_newHist" placeholder="Ex: Appel téléphonique, message envoyé..."/>
-      ${historyHtml ? `<h3 style="margin-top:14px;">Historique</h3><div class="timeline">${historyHtml}</div>` : ""}
+      ${historyHtml ? `<h3 style="margin-top:14px;">📋 Historique des notes &amp; actions</h3><div class="timeline">${historyHtml}</div>` : `<h3 style="margin-top:14px;">📋 Historique des notes &amp; actions</h3><div class="empty-state" style="padding:20px;font-size:12px;">Aucune note pour l'instant</div>`}
     </div>
     <div class="modal-actions">
-      ${!isNew ? '<button class="btn btn-danger" id="delCt">Supprimer</button>' : ''}
+      ${!isNew && isAdmin ? '<button class="btn btn-danger" id="delCt">Supprimer</button>' : ''}
+      ${!isNew ? '<button class="btn btn-ghost" id="ctRdvBtn" style="background:rgba(192,38,211,.15);color:var(--p);border-color:rgba(192,38,211,.3);">📅 Prendre RDV</button>' : ''}
       <button class="btn btn-ghost" id="cancelCt">Annuler</button>
       <button class="btn" id="saveCt">Enregistrer</button>
     </div>
   `, "modal-lg");
   document.getElementById("cancelCt").addEventListener("click", closeModal);
   document.getElementById("delCt")?.addEventListener("click", () => confirmDeleteContact(id));
+  document.getElementById("ctRdvBtn")?.addEventListener("click", () => {
+    // Ouvre la modal RDV avec le contact pré-rempli, le collaborateur assigné et un titre par défaut
+    closeModal();
+    setTimeout(() => {
+      openEventModal(null, null, {
+        contactId: c.id,
+        assignedTo: c.assignedTo || state.currentUser?.id || "",
+        title: `RDV avec ${c.nom}`,
+      });
+    }, 150);
+  });
   document.getElementById("saveCt").addEventListener("click", async () => {
     const btn = document.getElementById("saveCt");
     setLoading(btn, true);
-    const data = {
-      nom: document.getElementById("ct_nom").value.trim(),
-      email: document.getElementById("ct_email").value.trim(),
-      tel: document.getElementById("ct_tel").value.trim(),
-      ville: document.getElementById("ct_ville").value.trim(),
-      statut: document.getElementById("ct_statut").value,
-      assignedTo: document.getElementById("ct_assigned").value,
-      groupId: document.getElementById("ct_group").value || null,
-      notes: document.getElementById("ct_notes").value.trim(),
-      tags: c.tags || [],
-      history: c.history || [],
-      custom: { ...(c.custom || {}) },
-    };
-    state.settings.customFields.forEach(f => { data.custom[f.key] = document.getElementById("ct_custom_" + f.key).value; });
+    let data;
+    if (!isAdmin) {
+      // Membre : statut + notes + historique modifiables uniquement
+      data = {
+        ...c,
+        statut: document.getElementById("ct_statut").value,
+        notes: document.getElementById("ct_notes").value.trim(),
+        history: c.history || [],
+      };
+    } else {
+      data = {
+        nom: document.getElementById("ct_nom").value.trim(),
+        email: document.getElementById("ct_email").value.trim(),
+        tel: document.getElementById("ct_tel").value.trim(),
+        ville: document.getElementById("ct_ville").value.trim(),
+        statut: document.getElementById("ct_statut").value,
+        assignedTo: document.getElementById("ct_assigned").value,
+        groupId: document.getElementById("ct_group").value || null,
+        notes: document.getElementById("ct_notes").value.trim(),
+        tags: c.tags || [],
+        history: c.history || [],
+        custom: { ...(c.custom || {}) },
+      };
+      state.settings.customFields.forEach(f => { data.custom[f.key] = document.getElementById("ct_custom_" + f.key).value; });
+    }
     const newHist = document.getElementById("ct_newHist").value.trim();
     if (newHist) data.history.unshift({ text: newHist, at: Date.now(), by: state.currentUser?.nom || "?" });
     if (!data.nom) { toast("Le nom est requis", "error"); setLoading(btn, false); return; }
@@ -1723,8 +1910,13 @@ function renderCalendar() {
   const today = new Date();
   const isThisMonth = year === today.getFullYear() && month === today.getMonth();
 
+  // RBAC : l'admin voit tous les RDV, les membres uniquement les leurs
+  const isAdmin = !!state.currentUser?.isAdmin;
+  const myId = state.currentUser?.id;
+  const visibleEvents = (state.events || []).filter(e => isAdmin || e.user === myId || e.assignedTo === myId);
+
   // Events for this month
-  const monthEvents = (state.events || []).filter(e => {
+  const monthEvents = visibleEvents.filter(e => {
     const d = new Date(e.date);
     return d.getFullYear() === year && d.getMonth() === month;
   });
@@ -1743,14 +1935,14 @@ function renderCalendar() {
   }
 
   const dayNames = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
-  const upcoming = (state.events || [])
+  const upcoming = visibleEvents
     .filter(e => e.date >= Date.now() - 86400000)
     .sort((a, b) => a.date - b.date)
     .slice(0, 20);
 
   document.getElementById("dashMain").innerHTML = `
     <div class="dash-header">
-      <div><div class="dash-title">Calendrier</div><div class="dash-subtitle">Gère tes rendez-vous et rappels · Fuseau : ${Intl.DateTimeFormat().resolvedOptions().timeZone}</div></div>
+      <div><div class="dash-title">Calendrier${isAdmin ? ' <span style="font-size:11px;font-weight:500;color:var(--text-soft);">— vue globale admin</span>' : ''}</div><div class="dash-subtitle">Gère tes rendez-vous et rappels · Fuseau : ${Intl.DateTimeFormat().resolvedOptions().timeZone}</div></div>
       <div class="dash-actions"><button class="btn btn-sm" id="newEvent">+ Nouveau RDV</button></div>
     </div>
     <div class="calendar-wrap">
@@ -1770,9 +1962,12 @@ function renderCalendar() {
         <h3 style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-soft);margin:18px 0 10px;font-weight:700;">Prochains rendez-vous</h3>
         ${upcoming.length ? upcoming.map(e => {
           const d = new Date(e.date);
+          const owner = state.staff.find(s => s.id === (e.assignedTo || e.user));
+          const ownerBadge = isAdmin && owner ? `<span style="font-size:10px;padding:2px 8px;background:var(--glass);border-radius:8px;color:var(--text-soft);margin-left:6px;">${owner.nom}</span>` : '';
+          const contactBadge = e.contactId ? `<span style="font-size:10px;padding:2px 8px;background:rgba(192,38,211,.15);color:var(--p);border-radius:8px;margin-left:6px;">👤 Client</span>` : '';
           return `<div class="event-item" data-event-id="${e.id}">
             <div class="event-time"><div>${d.toLocaleDateString("fr-FR", { day:"2-digit", month:"short" })}</div><div class="h">${d.toLocaleTimeString("fr-FR", { hour:"2-digit", minute:"2-digit" })}</div></div>
-            <div><div class="event-title">${e.title}</div><div class="event-desc">${e.desc || ""}</div></div>
+            <div><div class="event-title">${e.title} ${contactBadge}${ownerBadge}</div><div class="event-desc">${e.desc || ""}</div></div>
             <button class="icon-btn" data-del-event="${e.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
           </div>`;
         }).join("") : '<div class="empty-state">Aucun rendez-vous planifié</div>'}
@@ -1810,23 +2005,36 @@ function renderCalendar() {
   }));
 }
 
-function openEventModal(id, defaultDate) {
+function openEventModal(id, defaultDate, prefill) {
   const ev = id ? (state.events || []).find(e => e.id === id) : null;
   const d = new Date(ev?.date || defaultDate || Date.now());
   // Format en heure LOCALE du navigateur (pas UTC) pour affichage correct quel que soit le fuseau
   const pad = n => String(n).padStart(2, "0");
   const dateStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const isAdmin = !!state.currentUser?.isAdmin;
+  const currentAssignee = ev?.assignedTo || ev?.user || prefill?.assignedTo || state.currentUser?.id || "";
+  const linkedContactId = ev?.contactId || prefill?.contactId || "";
+  const linkedContact = linkedContactId ? state.contacts.find(c => c.id === linkedContactId) : null;
+  const initialTitle = ev?.title || prefill?.title || "";
 
   openModal(`
     <h2>${ev ? "Modifier RDV" : "Nouveau rendez-vous"}</h2>
     <div class="modal-form">
-      <label>Titre</label><input id="ev_title" value="${ev?.title || ''}" placeholder="Ex: Appel client Dupont"/>
+      ${linkedContact ? `<div style="padding:10px 14px;background:rgba(192,38,211,.12);border:1px solid rgba(192,38,211,.3);border-radius:12px;font-size:12px;color:var(--label);margin-bottom:6px;">👤 Client lié : <b>${linkedContact.nom}</b>${linkedContact.tel ? ' · ' + linkedContact.tel : ''}</div>` : ''}
+      <label>Titre</label><input id="ev_title" value="${initialTitle}" placeholder="Ex: Appel client Dupont"/>
       <div class="modal-form-row">
         <div><label>Date</label><input id="ev_date" type="date" value="${dateStr}"/></div>
         <div><label>Heure</label><input id="ev_time" type="time" value="${timeStr}"/></div>
       </div>
       <label>Description</label><textarea id="ev_desc">${ev?.desc || ''}</textarea>
+      ${isAdmin ? `
+      <label>Assigné à</label>
+      <select id="ev_assigned">
+        <option value="">— Moi (Admin) —</option>
+        ${state.staff.map(s => `<option value="${s.id}" ${s.id === currentAssignee ? "selected" : ""}>${s.nom}</option>`).join("")}
+      </select>
+      ` : ''}
       <label>Rappel avant l'événement</label>
       <select id="ev_reminder">
         <option value="0" ${(ev?.reminder || 0) === 0 ? "selected" : ""}>Aucun</option>
@@ -1859,14 +2067,20 @@ function openEventModal(id, defaultDate) {
     const [y, m, dd] = document.getElementById("ev_date").value.split("-");
     const [hh, mm] = document.getElementById("ev_time").value.split(":");
     const date = new Date(+y, +m - 1, +dd, +hh, +mm).getTime();
+    const assignedTo = isAdmin
+      ? (document.getElementById("ev_assigned").value || state.currentUser?.id || "")
+      : (state.currentUser?.id || "");
     const data = {
       id: id || ("ev" + Date.now()),
       title,
       desc: document.getElementById("ev_desc").value.trim(),
       date,
       reminder: parseInt(document.getElementById("ev_reminder").value) || 0,
-      user: state.currentUser?.id || "",
+      user: assignedTo,
+      assignedTo,
+      contactId: linkedContactId || null,
       createdAt: ev?.createdAt || Date.now(),
+      createdBy: ev?.createdBy || state.currentUser?.id || "",
     };
     try {
       if (FIREBASE_READY) await saveDoc("events", data.id, data);
@@ -1877,10 +2091,30 @@ function openEventModal(id, defaultDate) {
         else state.events.push(data);
         localStorage.setItem("crm_events", JSON.stringify(state.events));
       }
+      // Notification pour le collaborateur assigné si ce n'est pas soi
+      if (assignedTo && assignedTo !== state.currentUser?.id) {
+        await addNotification({
+          title: "Nouveau RDV planifié",
+          msg: `${title} — ${new Date(date).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`,
+          type: "info",
+          userId: assignedTo,
+        });
+      }
+      // Ajouter à l'historique du contact si lié
+      if (linkedContactId && linkedContact) {
+        const histEntry = {
+          text: `📅 RDV planifié : ${title} — ${new Date(date).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`,
+          at: Date.now(),
+          by: state.currentUser?.nom || "?",
+        };
+        linkedContact.history = linkedContact.history || [];
+        linkedContact.history.unshift(histEntry);
+        try { await saveDoc("contacts", linkedContactId, linkedContact); } catch {}
+      }
       await logActivity(id ? "Modification RDV" : "Création RDV", title);
       toast(id ? "Modifié" : "Créé", "success");
       closeModal();
-      renderCalendar();
+      if (state.view === "calendar") renderCalendar();
     } catch { toast("Erreur", "error"); }
     finally { setLoading(btn, false); }
   });
@@ -1911,6 +2145,12 @@ function renderPrefs() {
   document.getElementById("dashMain").innerHTML = `
     <div class="dash-header">
       <div><div class="dash-title">Préférences</div><div class="dash-subtitle">Personnalise ton expérience</div></div>
+    </div>
+
+    <div class="panel-card">
+      <h3>👤 Mon profil</h3>
+      <p style="font-size:12px;color:var(--text-soft);margin-bottom:14px;">Change ton nom, prénom ou ta photo.</p>
+      <button class="btn" id="openProfileBtn">Modifier mon profil</button>
     </div>
 
     <div class="panel-card">
@@ -1961,6 +2201,8 @@ function renderPrefs() {
 
     <button class="btn" id="savePrefs" style="margin-top:18px;">Enregistrer les préférences</button>
   `;
+
+  document.getElementById("openProfileBtn").addEventListener("click", openProfileModal);
 
   document.getElementById("testSound").addEventListener("click", () => {
     const tempPrefs = { ...p, soundAlerts: true, soundType: document.getElementById("pref_soundType").value };
@@ -2127,35 +2369,107 @@ function renderAdminTab() {
 function renderTabCollab(c) {
   c.innerHTML = `
     <div class="panel-card">
-      <h3>Collaborateurs (${state.staff.length})</h3>
+      <h3>Collaborateurs (${state.staff.length}) <span style="font-size:11px;font-weight:500;color:var(--text-soft);">— clic pour voir les stats</span></h3>
       <div class="admin-list">
-        ${state.staff.map(s => `
-          <div class="admin-list-item">
+        ${state.staff.map(s => {
+          const leads = state.contacts.filter(ct => ct.assignedTo === s.id);
+          return `
+          <div class="admin-list-item clickable" data-stats-staff="${s.id}">
             <img src="${s.img}" alt=""/>
             <div class="info">
               <div class="info-name">${s.nom}</div>
               <div class="info-mail">${s.email || ""}</div>
-              <div class="info-meta">${s.role || "member"}</div>
+              <div class="info-meta">${s.role || "member"} · ${leads.length} lead${leads.length>1?'s':''}</div>
             </div>
             <div class="actions">
-              <button class="icon-btn" data-edit-staff="${s.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-              <button class="icon-btn" data-del-staff="${s.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+              <button class="icon-btn" data-edit-staff="${s.id}" title="Modifier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+              <button class="icon-btn" data-del-staff="${s.id}" title="Supprimer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
             </div>
           </div>
-        `).join("")}
+        `;}).join("")}
       </div>
     </div>
   `;
-  c.querySelectorAll("[data-edit-staff]").forEach(b => b.addEventListener("click", () => editStaffModal(b.dataset.editStaff)));
-  c.querySelectorAll("[data-del-staff]").forEach(b => b.addEventListener("click", () => confirmDeleteStaff(b.dataset.delStaff)));
+  c.querySelectorAll("[data-edit-staff]").forEach(b => b.addEventListener("click", e => { e.stopPropagation(); editStaffModal(b.dataset.editStaff); }));
+  c.querySelectorAll("[data-del-staff]").forEach(b => b.addEventListener("click", e => { e.stopPropagation(); confirmDeleteStaff(b.dataset.delStaff); }));
+  c.querySelectorAll("[data-stats-staff]").forEach(row => row.addEventListener("click", e => {
+    if (e.target.closest(".icon-btn")) return;
+    openStaffStatsModal(row.dataset.statsStaff);
+  }));
+}
+
+function openStaffStatsModal(staffId) {
+  const s = state.staff.find(x => x.id === staffId);
+  if (!s) return;
+  const leads = state.contacts.filter(c => c.assignedTo === staffId);
+  const total = leads.length;
+  // Compte par statut en se basant sur les statuts configurés
+  const byStatus = {};
+  state.settings.statuses.forEach(st => {
+    byStatus[st.key] = { label: st.label, color: st.color, count: leads.filter(l => l.statut === st.key).length };
+  });
+  const traite = leads.filter(l => l.statut === "traite").length;
+  const pct = total ? Math.round((traite / total) * 100) : 0;
+  // Heuristiques pour les "à rappeler" et "sans réponse"
+  const toCall = leads.filter(l => {
+    const st = (l.statut || "").toLowerCase();
+    return st.includes("rappel") || st.includes("callback") || st.includes("a_rappeler") || st.includes("arappeler");
+  }).length;
+  const noAnswer = leads.filter(l => {
+    const st = (l.statut || "").toLowerCase();
+    return st.includes("sans") || st.includes("injoignable") || st.includes("no_answer") || st.includes("nrp");
+  }).length;
+  const nouveau = leads.filter(l => !l.statut || l.statut === "nouveau").length;
+  // Non attribués globaux (info utile pour l'admin)
+  const unassignedGlobal = state.contacts.filter(c => !c.assignedTo).length;
+
+  const statusRows = Object.values(byStatus).map(st => `
+    <div class="bar-row">
+      <div class="bar-label">${st.label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${total?(st.count/total)*100:0}%;background:${st.color}"></div></div>
+      <div class="bar-value">${st.count}</div>
+    </div>
+  `).join("");
+
+  openModal(`
+    <h2 style="display:flex;align-items:center;gap:12px;">
+      <img src="${s.img}" style="width:48px;height:48px;border-radius:14px;object-fit:cover;"/>
+      ${s.nom}
+    </h2>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:4px;">${s.email || ""} · ${s.role || "member"}</p>
+    <div class="collab-stat-grid">
+      <div class="collab-stat-card"><div class="val">${total}</div><div class="lbl">Leads totaux</div></div>
+      <div class="collab-stat-card"><div class="val">${traite}</div><div class="lbl">Traités</div></div>
+      <div class="collab-stat-card"><div class="val">${pct}%</div><div class="lbl">Conversion</div></div>
+      <div class="collab-stat-card"><div class="val">${nouveau}</div><div class="lbl">Nouveaux</div></div>
+      <div class="collab-stat-card"><div class="val">${toCall}</div><div class="lbl">À rappeler</div></div>
+      <div class="collab-stat-card"><div class="val">${noAnswer}</div><div class="lbl">Sans réponse</div></div>
+    </div>
+    <div class="panel-card" style="margin-top:8px;">
+      <h3>Répartition par statut</h3>
+      <div class="bar-chart">${statusRows || '<div class="empty-state">Aucun lead</div>'}</div>
+    </div>
+    <p style="font-size:11px;color:var(--text-soft);margin-top:10px;">Info globale : ${unassignedGlobal} lead${unassignedGlobal>1?'s':''} non attribué${unassignedGlobal>1?'s':''} au total.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="closeStats">Fermer</button>
+    </div>
+  `, "modal-lg");
+  document.getElementById("closeStats").addEventListener("click", closeModal);
 }
 function editStaffModal(id) {
   const s = state.staff.find(x => x.id === id);
   if (!s) return;
+  let selectedImg = s.img || DEFAULT_AVATARS[0];
+  const [firstName, ...rest] = (s.nom || "").split(" ");
+  const lastName = rest.join(" ");
   openModal(`
-    <h2>Modifier ${s.nom}</h2>
+    <h2>Modifier le collaborateur</h2>
     <div class="modal-form">
-      <label>Nom</label><input id="ed_nom" value="${s.nom || ''}"/>
+      <img src="${selectedImg}" id="edStaffPreview" class="profile-pic-big" alt=""/>
+      <div class="modal-form-row">
+        <div><label>Prénom</label><input id="ed_first" value="${firstName || ''}"/></div>
+        <div><label>Nom</label><input id="ed_last" value="${lastName || ''}"/></div>
+      </div>
       <label>Email</label><input id="ed_email" value="${s.email || ''}"/>
       <label>Mot de passe (laisser vide pour ne pas changer)</label><input id="ed_pass" type="password"/>
       <label>Rôle</label>
@@ -2164,21 +2478,64 @@ function editStaffModal(id) {
         <option value="manager" ${s.role === "manager" ? "selected" : ""}>Manager</option>
         <option value="admin"   ${s.role === "admin"   ? "selected" : ""}>Admin</option>
       </select>
+      <label>Photo personnelle (URL)</label>
+      <input id="ed_customImg" placeholder="https://..." value="${s.img && !DEFAULT_AVATARS.includes(s.img) ? s.img : ''}"/>
+      <label style="margin-top:10px;">Ou choisis un avatar</label>
+      <div class="avatar-gallery" id="edAvatarGallery">
+        ${DEFAULT_AVATARS.map(a => `<img src="${a}" data-avatar="${a}" class="${a === selectedImg ? 'selected' : ''}"/>`).join("")}
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="cancelEdit">Annuler</button>
       <button class="btn" id="saveEdit">Enregistrer</button>
     </div>
-  `);
+  `, "modal-lg");
+  const preview = document.getElementById("edStaffPreview");
+  const customInput = document.getElementById("ed_customImg");
+  document.querySelectorAll("#edAvatarGallery img").forEach(el => {
+    el.addEventListener("click", () => {
+      selectedImg = el.dataset.avatar;
+      preview.src = selectedImg;
+      customInput.value = "";
+      document.querySelectorAll("#edAvatarGallery img").forEach(x => x.classList.remove("selected"));
+      el.classList.add("selected");
+    });
+  });
+  customInput.addEventListener("input", () => {
+    if (customInput.value.trim()) {
+      selectedImg = customInput.value.trim();
+      preview.src = selectedImg;
+      document.querySelectorAll("#edAvatarGallery img").forEach(x => x.classList.remove("selected"));
+    }
+  });
   document.getElementById("cancelEdit").addEventListener("click", closeModal);
   document.getElementById("saveEdit").addEventListener("click", async () => {
     const btn = document.getElementById("saveEdit");
     setLoading(btn, true);
-    const data = { nom: document.getElementById("ed_nom").value.trim(), email: document.getElementById("ed_email").value.trim(), role: document.getElementById("ed_role").value };
+    const first = document.getElementById("ed_first").value.trim();
+    const last = document.getElementById("ed_last").value.trim();
+    const nom = (first + " " + last).trim();
+    if (!nom) { toast("Prénom requis", "error"); setLoading(btn, false); return; }
+    const finalImg = customInput.value.trim() || selectedImg;
+    const data = {
+      nom,
+      img: finalImg,
+      email: document.getElementById("ed_email").value.trim(),
+      role: document.getElementById("ed_role").value
+    };
     const np = document.getElementById("ed_pass").value;
     if (np) data.pass = np;
-    try { await saveDoc("staff", id, data); await logActivity("Modification collab", data.nom); toast("Modifié", "success"); renderOrbit(); renderAdminTab(); closeModal(); }
-    catch { toast("Erreur", "error"); }
+    try {
+      await saveDoc("staff", id, data);
+      // Sync local state immediately
+      const local = state.staff.find(x => x.id === id);
+      if (local) Object.assign(local, data);
+      await logActivity("Modification collab", data.nom);
+      toast("Modifié", "success");
+      renderOrbit();
+      renderAdminTab();
+      closeModal();
+    } catch { toast("Erreur", "error"); }
     finally { setLoading(btn, false); }
   });
 }
